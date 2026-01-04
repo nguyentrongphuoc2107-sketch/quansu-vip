@@ -40,6 +40,12 @@ st.markdown("""
     }
     .metric-value { font-size: 28px; font-weight: bold; color: white; }
     .metric-label { font-size: 14px; color: #888; }
+    
+    /* Cảnh báo phiên */
+    .alert-box {
+        padding: 15px; background-color: #330000; border: 1px solid red; 
+        color: red; text-align: center; border-radius: 10px; font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -51,14 +57,6 @@ class GodModeV35:
         if 'history_outcomes' not in st.session_state: st.session_state.history_outcomes = []
         if 'markov_matrix' not in st.session_state: st.session_state.markov_matrix = {}
         self.capital = capital
-
-    def undo_last(self):
-        """Tính năng cứu cánh: Xóa lệnh nhập sai gần nhất"""
-        if len(st.session_state.history_scores) > 0:
-            st.session_state.history_scores.pop()
-            st.session_state.history_outcomes.pop()
-            # Note: Không xóa dữ liệu trong Markov Matrix để giữ trí nhớ dài hạn (hoặc reset nếu muốn)
-            st.toast("Đã hoàn tác phiên trước!", icon="↩️")
 
     def update(self, score):
         outcome = 1 if score >= 11 else 0 # 1=Tài, 0=Xỉu
@@ -177,9 +175,27 @@ with col_tai:
     for i in range(15, 19): 
         if c_t2.button(f"💎 {i}"): bot.update(i); st.rerun()
 
-# HIỂN THỊ KẾT QUẢ
+# --- HIỂN THỊ KẾT QUẢ & CẢNH BÁO AN TOÀN ---
 st.markdown("---")
-if len(st.session_state.history_scores) >= 5:
+
+# Lấy số lượng phiên hiện tại
+session_count = len(st.session_state.history_scores)
+
+if session_count >= 5:
+    # --- TÍNH NĂNG MỚI: CẦU CHÌ AN TOÀN ---
+    # Nếu quá 50 phiên, dừng toàn bộ hệ thống để ép Reset
+    if session_count >= 50:
+        st.markdown(f"""
+        <div class="alert-box">
+            <h1>⚠️ CẢNH BÁO: ĐÃ ĐẠT {session_count} PHIÊN!</h1>
+            <h3>HỆ THỐNG TẠM KHÓA ĐỂ BẢO VỆ TÀI SẢN.</h3>
+            <p>Nhà cái có thể đã thay đổi thuật toán (Reset Seed).</p>
+            <p>Vui lòng bấm nút <b>'🔥 RESET'</b> bên trái để làm mới dữ liệu và tiếp tục chiến đấu!</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop() # Lệnh này chặn không cho code chạy tiếp phần dưới
+    
+    # Nếu chưa đến 50 phiên thì chạy bình thường
     res = bot.analyze()
     if res:
         direction, conf, patt, money, log = res
@@ -211,7 +227,10 @@ if len(st.session_state.history_scores) >= 5:
         with m2: 
             action = "CHỐT MẠNH" if conf > 80 else "THĂM DÒ" if conf > 60 else "QUAN SÁT"
             st.markdown(f"<div class='metric-value' style='color:{main_color}'>{action}</div><div class='metric-label'>CHIẾN THUẬT</div>", unsafe_allow_html=True)
-        with m3: st.markdown(f"<div class='metric-value'>{len(st.session_state.history_scores)}</div><div class='metric-label'>SỐ PHIÊN ĐÃ HỌC</div>", unsafe_allow_html=True)
+        with m3: 
+            # Hiển thị số phiên kèm màu cảnh báo nếu sắp đến giới hạn
+            ss_color = "white" if session_count < 40 else "orange"
+            st.markdown(f"<div class='metric-value' style='color:{ss_color}'>{session_count}/50</div><div class='metric-label'>GIỚI HẠN PHIÊN</div>", unsafe_allow_html=True)
 
         # 3. LÝ DO
         st.info(f"**🕵️ GIẢI MÃ THUẬT TOÁN:** {log}")
