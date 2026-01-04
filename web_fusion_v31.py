@@ -1,94 +1,171 @@
 import streamlit as st
+import numpy as np
 import plotly.graph_objects as go
+from datetime import datetime
 
-# 1. CẤU HÌNH HỆ THỐNG VIP
-st.set_page_config(page_title="V31 - ULTIMATE FUSION VIP", layout="wide")
+# --- CẤU HÌNH TRANG ---
+st.set_page_config(page_title="V35 - THE ARCHITECT PRO", layout="wide", initial_sidebar_state="collapsed")
 
-if 'data' not in st.session_state:
-    st.session_state.data = []
+# --- CSS CUSTOM ĐỂ GIAO DIỆN ĐẸP NHƯ APP ---
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        height: 3em;
+        background-color: #262730;
+        color: white;
+        border: 1px solid #4x4x4x;
+    }
+    .stButton>button:hover { border: 1px solid #00FBFF; color: #00FBFF; }
+    .status-box {
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 20px;
+        border: 1px solid #333;
+    }
+    h1, h2, h3 { text-align: center; color: #00FBFF; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- BỘ NÃO TỔNG HỢP THUẬT TOÁN (FUSION ENGINE) ---
-def fusion_analytics(data):
-    if len(data) < 6:
-        return "THĂM DÒ", 0, ["Hệ thống cần tối thiểu 6 phiên để nạp Ma Trận Đa Tầng."], "N/A"
-    
-    tongs = [d['t'] for d in data]
-    x1, x2, x3 = [d['x1'] for d in data], [d['x2'] for d in data], [d['x3'] for d in data]
-    chuoi = ["T" if x > 10 else "X" for x in tongs]
-    
-    score_T, score_X = 0, 0
-    ly_do = []
-    loai_cau = "Cầu Linh Hoạt"
+# --- CLASS THUẬT TOÁN CỦA ÔNG (ĐÃ TỐI ƯU CHO WEB) ---
+class ArchitectV35Web:
+    def __init__(self, initial_capital):
+        if 'history_scores' not in st.session_state:
+            st.session_state.history_scores = []
+        if 'history_outcomes' not in st.session_state:
+            st.session_state.history_outcomes = []
+        if 'markov_matrix' not in st.session_state:
+            st.session_state.markov_matrix = {}
+        self.capital = initial_capital
 
-    # THUẬT TOÁN 1: MA TRẬN MARKOV (SOI MẪU CHUỖI)
-    pattern = "".join(chuoi[-3:])
-    vung_dem = "".join(chuoi[:-1])
-    t_count = vung_dem.count(pattern + "T")
-    x_count = vung_dem.count(pattern + "X")
-    if t_count > x_count: score_T += 35; ly_do.append(f"🧬 Markov: Mẫu {pattern} nghiêng Tài ({t_count} lần)")
-    elif x_count > t_count: score_X += 35; ly_do.append(f"🧬 Markov: Mẫu {pattern} nghiêng Xỉu ({x_count} lần)")
+    def update_data(self, score):
+        outcome = 1 if score >= 11 else 0
+        st.session_state.history_scores.append(score)
+        st.session_state.history_outcomes.append(outcome)
+        
+        # Cập nhật Markov
+        if len(st.session_state.history_outcomes) >= 4:
+            prev_state = tuple(st.session_state.history_outcomes[-4:-1])
+            actual_result = st.session_state.history_outcomes[-1]
+            if prev_state not in st.session_state.markov_matrix:
+                st.session_state.markov_matrix[prev_state] = {0: 0, 1: 0}
+            st.session_state.markov_matrix[prev_state][actual_result] += 1
 
-    # THUẬT TOÁN 2: NHẬN DIỆN CẤU TRÚC (BỆT / 1-1 / 2-2)
-    gan_nhat = chuoi[-4:]
-    if all(x == "T" for x in chuoi[-3:]): 
-        score_T += 45; loai_cau = "🔥 BỆT TÀI"; ly_do.append("Nhịp bệt đang chạy, ưu tiên thuận thiên.")
-    elif all(x == "X" for x in chuoi[-3:]): 
-        score_X += 45; loai_cau = "🔥 BỆT XỈU"; ly_do.append("Nhịp bệt đang chạy, ưu tiên thuận thiên.")
-    elif gan_nhat in [['T','X','T','X'], ['X','T','X','T']]:
-        loai_cau = "🌊 CẦU ĐẢO 1-1"; ly_do.append("Cầu 1-1 cực nét, đánh đối xứng phiên trước.")
-        if chuoi[-1] == "T": score_X += 50
-        else: score_T += 50
+    def analyze_all(self):
+        scores = st.session_state.history_scores
+        outcomes = st.session_state.history_outcomes
+        
+        if len(outcomes) < 3: return None
+        
+        # 1. Pattern
+        p_pattern, pattern_name = 0.5, "Đang quét..."
+        last_3 = outcomes[-3:]
+        if sum(last_3) == 3: p_pattern, pattern_name = 0.7, "BỆT TÀI 🔥"
+        elif sum(last_3) == 0: p_pattern, pattern_name = 0.3, "BỆT XỈU 🔥"
+        elif outcomes[-2:] == [1, 0] or outcomes[-2:] == [0, 1]: p_pattern, pattern_name = 0.5, "CẦU NHẢY 🌊"
 
-    # THUẬT TOÁN 3: ĐIỂM RƠI HỒI QUY (VẬT LÝ XÍ NGẦU)
-    cuoi = tongs[-1]
-    if cuoi >= 15: score_X += 55; ly_do.append("💎 Điểm rơi: Chạm đỉnh ma trận, xác suất hồi Xỉu 95%")
-    elif cuoi <= 6: score_T += 55; ly_do.append("💎 Điểm rơi: Chạm đáy ma trận, xác suất bật Tài 95%")
+        # 2. Markov
+        p_markov = 0.5
+        current_state = tuple(outcomes[-3:])
+        if current_state in st.session_state.markov_matrix:
+            stats = st.session_state.history_outcomes # Sửa nhẹ logic lấy stats
+            s = st.session_state.markov_matrix[current_state]
+            total = s[0] + s[1]
+            if total > 0: p_markov = s[1] / total
 
-    # TỔNG HỢP KẾT QUẢ
-    du_doan = "TÀI" if score_T > score_X else "XỈU"
-    tin_cay = min(max(score_T, score_X) + 5, 99)
-    
-    # CẢNH BÁO SOI (NẾU XUNG ĐỘT THÌ BỎ QUA)
-    if abs(score_T - score_X) < 15:
-        return "BỎ QUA", 40, ["Dữ liệu xung đột - Nhà cái có thể đang đổi thuật toán."], "Cầu Nhiễu"
+        # 3. Regression
+        p_regress = 0.5
+        if scores[-1] >= 16: p_regress = 0.2
+        elif scores[-1] <= 5: p_regress = 0.8
 
-    return du_doan, tin_cay, ly_do, loai_cau
+        # Fusion
+        final_prob = (p_pattern * 0.3) + (p_markov * 0.4) + (p_regress * 0.3)
+        direction = "TÀI" if final_prob > 0.5 else "XỈU"
+        conf = final_prob if final_prob > 0.5 else (1 - final_prob)
+        
+        # Kelly
+        b = 0.95
+        f_star = (b * conf - (1 - conf)) / b
+        bet_amt = self.capital * max(min(f_star * 0.5, 0.05), 0)
+        
+        return direction, conf * 100, pattern_name, int(bet_amt), f"M:{p_markov:.2f}|P:{p_pattern:.2f}|R:{p_regress:.2f}"
 
-# --- GIAO DIỆN HIỂN THỊ ---
-st.markdown("<h1 style='text-align: center; color: #FFD700;'>🛡️ ULTIMATE FUSION V31</h1>", unsafe_allow_html=True)
+# --- GIAO DIỆN TRANG CHỦ ---
+st.write(f"### 🏛️ THE ARCHITECT V35 PRO")
+st.write(f"<p style='text-align:center; color:grey;'>{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>", unsafe_allow_html=True)
 
-col_in, col_viz = st.columns([1, 2])
-
-with col_in:
-    st.subheader("📥 NHẬP XÍ NGẦU")
-    v1 = st.radio("XN 1", [1,2,3,4,5,6], horizontal=True, key="xn1")
-    v2 = st.radio("XN 2", [1,2,3,4,5,6], horizontal=True, key="xn2")
-    v3 = st.radio("XN 3", [1,2,3,4,5,6], horizontal=True, key="xn3")
-    
-    if st.button("🚀 CHỐT PHIÊN", use_container_width=True):
-        st.session_state.data.append({'t': v1+v2+v3, 'x1': v1, 'x2': v2, 'x3': v3})
+# Quản lý vốn ở Sidebar
+with st.sidebar:
+    st.header("💰 TÀI CHÍNH")
+    user_capital = st.number_input("Vốn hiện tại (VNĐ):", value=1000000, step=100000)
+    if st.button("XÓA DỮ LIỆU CẦU"):
+        st.session_state.history_scores = []
+        st.session_state.history_outcomes = []
+        st.session_state.markov_matrix = {}
         st.rerun()
-    
-    if st.button("🔄 LÀM MỚI"):
-        st.session_state.data = []
+
+bot = ArchitectV35Web(user_capital)
+
+# --- KHU VỰC NHẬP LIỆU (NÚT BẤM TO) ---
+st.write("---")
+cols = st.columns(8)
+for i in range(3, 11):
+    if cols[i-3].button(str(i), key=f"btn_{i}"):
+        bot.update_data(i)
+        st.rerun()
+cols2 = st.columns(8)
+for i in range(11, 19):
+    if cols2[i-11].button(str(i), key=f"btn_{i}"):
+        bot.update_data(i)
         st.rerun()
 
-with col_viz:
-    if st.session_state.data:
-        t_list = [d['t'] for d in st.session_state.data]
-        fig = go.Figure(go.Scatter(y=t_list, mode='lines+markers+text', text=t_list, 
-                                   line=dict(color='gold', width=4),
-                                   marker=dict(size=12, color='white', line=dict(width=2, color='black'))))
-        fig.update_layout(template="plotly_dark", height=350, margin=dict(l=10,r=10,t=10,b=10))
+# --- KHU VỰC HIỂN THỊ KẾT QUẢ ---
+if len(st.session_state.history_scores) > 0:
+    res = bot.analyze_all()
+    if res:
+        direction, confidence, pattern, bet_amt, reason = res
+        
+        # Hộp màu báo hiệu
+        color = "#ff4b4b" if direction == "XỈU" else "#00f2ff"
+        if confidence < 60: color = "#444" # Cầu loạn màu xám
+
+        st.markdown(f"""
+            <div class="status-box" style="background-color: {color}22; border: 2px solid {color}">
+                <h1 style="color: {color}; margin:0">{direction}</h1>
+                <h3 style="color: white; margin:0">{confidence:.1f}% TIN CẬY</h3>
+                <p style="margin:5px 0 0 0">Hình thái: <b>{pattern}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Thông tin cược
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric("TIỀN VÀO", f"{bet_amt:,.0f} đ")
+        with c2:
+            status = "🔥 CHỐT MẠNH" if confidence > 80 else "⚠️ THĂM DÒ" if confidence > 65 else "🛑 BỎ QUA"
+            st.metric("CHIẾN THUẬT", status)
+
+        # Biểu đồ nhịp cầu Plotly
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            y=st.session_state.history_scores, 
+            mode='lines+markers+text',
+            text=st.session_state.history_scores,
+            textposition="top center",
+            line=dict(color='#00FBFF', width=2)
+        ))
+        fig.update_layout(
+            template="plotly_dark", height=300, 
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig, use_container_width=True)
-
-st.divider()
-
-if st.session_state.data:
-    keo, cf, ld, nhip = fusion_analytics(st.session_state.data)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("KÈO CHỐT", keo)
-    c2.metric("ĐỘ TIN CẬY", f"{cf}%")
-    c3.metric("NHẬN DIỆN CẦU", nhip)
-    with st.expander("📝 LẬP LUẬN TỔNG HỢP", expanded=True):
-        for line in ld: st.write(f"🔹 {line}")
+        
+        st.caption(f"Log phân tích: {reason}")
+    else:
+        st.info("Nhập thêm ít nhất 3 phiên để bắt đầu phân tích...")
+else:
+    st.warning("Vui lòng nhập dữ liệu phiên gần nhất từ bàn cược.")
